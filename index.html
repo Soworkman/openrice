@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vivienne 專屬工具箱</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- LZ-String 壓縮庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;900&family=Noto+Sans+TC:wght@400;500;700;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #fbf9f4; 
+            background-image: radial-gradient(#dfdbd1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            /* 強制鎖定動態視窗高度，徹底禁止頁面拉動與橡皮筋效應 */
+            height: 100dvh;
+            overflow: hidden;
+            touch-action: none; 
+        }
+        
+        .serif-font { font-family: 'Noto Serif TC', serif; }
+        .mono-font { font-family: 'Space Mono', monospace; }
+
+        /* 滾動條美化 */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d6cfc4; border-radius: 99px; }
+
+        .jp-shadow { box-shadow: 0 4px 12px 0 rgba(70, 60, 50, 0.12), 0 1px 3px 0 rgba(70, 60, 50, 0.08); }
+        .jp-shadow-lg { box-shadow: 0 12px 28px -6px rgba(90, 80, 70, 0.25); }
+        .jp-shadow-sm { box-shadow: 2px 2px 0px #1c1917; } /* 分帳工具的復古陰影 */
+        
+        .no-indicator::-webkit-inner-spin-button,
+        .no-indicator::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        /* 分帳工具專用輸入框隱藏箭頭 */
+        input[type="number"] { -moz-appearance: textfield; }
+
+        /* 允許特定容器內部滑動 */
+        .touch-pan-y {
+            touch-action: pan-y;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 動畫 */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="text-stone-900 flex flex-col selection:bg-stone-800 selection:text-white">
+
+    <!-- 頂部高效率微型導航欄 (高度固定 56px，內含全局 App 切換) -->
+    <header class="border-b-2 border-stone-800 bg-white sticky top-0 z-50 shrink-0 h-[56px] flex items-center shadow-sm relative">
+        <div class="max-w-7xl mx-auto px-3 w-full flex justify-between items-center relative">
+            
+            <!-- 左側 Logo -->
+            <div class="flex items-center space-x-2 z-10 shrink-0">
+                <div class="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center shadow-md shrink-0">
+                    <span class="text-base font-black text-amber-200 font-serif">餓</span>
+                </div>
+                <div class="flex flex-col justify-center hidden xs:flex">
+                    <h1 class="text-[13px] font-black serif-font tracking-widest text-stone-900 leading-none mb-1">Vivienne有啲餓</h1>
+                    <div class="flex items-center space-x-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse shrink-0"></span>
+                        <span id="activeCountLabel" class="text-[9px] font-black text-stone-600 leading-none">就緒</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中央全局工具切換器 -->
+            <div class="absolute left-1/2 -translate-x-1/2 flex bg-stone-100 rounded-xl p-1 border-2 border-stone-200 z-10 jp-shadow-sm">
+                <button id="gbtn-roulette" onclick="switchGlobalApp('roulette')" class="px-3 py-1.5 text-[11px] font-black rounded-lg bg-white shadow-sm border border-stone-200 text-stone-900 transition-all flex items-center gap-1">
+                    <i data-lucide="dices" class="w-3.5 h-3.5"></i> 搖珠機
+                </button>
+                <button id="gbtn-split" onclick="switchGlobalApp('split')" class="px-3 py-1.5 text-[11px] font-black rounded-lg text-stone-500 hover:text-stone-900 transition-all flex items-center gap-1">
+                    <i data-lucide="calculator" class="w-3.5 h-3.5"></i> 分帳
+                </button>
+            </div>
+            
+            <!-- 右側按鈕 -->
+            <div class="flex items-center z-10 shrink-0">
+                <button onclick="toggleMute()" id="muteBtn" class="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 border-2 border-stone-800 text-stone-800 active:scale-95 transition-all" title="靜音/開音效">
+                    <i data-lucide="volume-2" id="muteIcon" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主容器：絕對定位填充剩餘空間，讓兩個 App 互相獨立 -->
+    <div class="flex-1 min-h-0 relative w-full max-w-7xl mx-auto">
+
+        <!-- ================================================================================= -->
+        <!-- APP 1: 午餐搖珠機 (完全繼承原版面) -->
+        <!-- ================================================================================= -->
+        <div id="app-roulette" class="absolute inset-0 flex flex-col z-10 bg-transparent">
+            
+            <main class="px-3 pt-2 flex-1 w-full min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4" style="padding-bottom: calc(64px + env(safe-area-inset-bottom));">
+                
+                <!-- 頁籤 1: 搖珠機核心區 -->
+                <section id="panel-machine" class="tab-panel flex lg:flex lg:col-span-5 flex-col items-center justify-between w-full h-full overflow-hidden">
+                    <div class="w-full max-w-sm flex items-center justify-center space-x-2 text-xs font-black text-stone-900 shrink-0 pb-1.5 pt-0.5">
+                        <span class="text-stone-700">篩選：</span>
+                        <span id="activeCategoryLabel" class="bg-stone-200 px-2.5 py-0.5 rounded border border-stone-400">全部</span>
+                        <span id="activePriceLabel" class="bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300 text-amber-950">所有預算</span>
+                    </div>
+
+                    <div class="flex-1 min-h-0 w-full max-w-[380px] flex items-center justify-center relative py-1">
+                        <canvas id="machineCanvas" width="800" height="720" class="w-full max-w-[380px] max-h-full object-contain bg-white rounded-[32px] border-2 border-stone-800 jp-shadow p-1.5" style="aspect-ratio: 10/9;"></canvas>
+                    </div>
+
+                    <div class="w-full max-w-[380px] flex flex-col items-center justify-center shrink-0 min-h-[120px] relative mt-1 pb-1">
+                        <button id="spinBtn" onclick="spin()" class="w-full py-4 rounded-[20px] bg-stone-900 hover:bg-stone-800 text-stone-50 font-black text-sm tracking-widest jp-shadow border-2 border-stone-800 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-md">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                            <span>搖動抽籤 (回す)</span>
+                        </button>
+
+                        <div id="resultCard" class="w-full relative bg-[#fcf9f2] border-2 border-stone-900 rounded-[24px] p-3.5 xs:p-4 flex flex-col items-center justify-between jp-shadow-lg scale-95 opacity-0 transition-all duration-300 transform pointer-events-none hidden overflow-hidden z-20">
+                            <div class="absolute -top-6 -right-6 w-20 h-20 bg-white rounded-full opacity-60 blur-xl pointer-events-none"></div>
+                            <div class="inline-block px-3.5 py-1 bg-stone-900 text-amber-100 text-[10px] font-black rounded-full tracking-widest uppercase border border-stone-950 shadow-sm z-10 mb-2">
+                                今日推薦決定
+                            </div>
+                            
+                            <div class="flex justify-center items-center space-x-3 w-full px-1 z-10 relative mb-2">
+                                <canvas id="resultBeanCanvas" width="48" height="48" class="shrink-0"></canvas>
+                                <h2 id="resultName" class="text-xl xs:text-2xl font-black serif-font text-stone-900 tracking-wide break-words text-center line-clamp-2">？？？</h2>
+                                <a id="mapLinkBtn" href="#" target="_blank" title="在地圖中查看" class="flex items-center justify-center w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 border-2 border-stone-800 text-emerald-600 shadow-sm active:scale-95 transition-all shrink-0">
+                                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                                </a>
+                            </div>
+                            
+                            <div class="flex items-center justify-center space-x-2 text-xs font-black text-stone-800 z-10 mb-3">
+                                <span id="resultCategory" class="bg-white px-2.5 py-1 rounded-md border-2 border-stone-300 shadow-sm"></span>
+                                <span id="resultPrice" class="bg-amber-100/80 px-2.5 py-1 rounded-md border-2 border-amber-300 text-amber-950 shadow-sm"></span>
+                            </div>
+                            
+                            <div class="flex items-center justify-center space-x-2.5 w-full z-10">
+                                <button onclick="spin()" class="flex-1 py-2.5 rounded-xl bg-white text-stone-900 font-black text-[11px] xs:text-xs tracking-wider transition-all flex items-center justify-center space-x-1.5 border-2 border-stone-900 active:scale-95 shadow-sm">
+                                    <i data-lucide="rotate-ccw" class="w-4 h-4 text-stone-600"></i>
+                                    <span>重搖</span>
+                                </button>
+                                <button onclick="lockSelection()" class="flex-[1.3] py-2.5 rounded-xl bg-stone-900 text-white font-black text-[11px] xs:text-xs tracking-wider transition-all flex items-center justify-center space-x-1.5 shadow-md active:scale-95">
+                                    <i data-lucide="check" class="w-4 h-4 text-amber-300"></i>
+                                    <span>就吃這家！</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 頁籤 2: 餐廳管理清單 -->
+                <section id="panel-list" class="tab-panel hidden lg:flex lg:col-span-4 flex-col h-full overflow-hidden">
+                    <div class="bg-white border-2 border-stone-800 rounded-2xl p-3 jp-shadow flex-1 flex flex-col h-full overflow-hidden min-h-0">
+                        <div class="flex items-center justify-between mb-2 pb-2 border-b-2 border-stone-100 shrink-0">
+                            <div class="flex items-center space-x-1.5">
+                                <i data-lucide="list-todo" class="w-4 h-4 text-stone-900"></i>
+                                <h3 class="font-black text-sm serif-font tracking-wider text-stone-900">候選名冊</h3>
+                                <span class="text-[9px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded-full ml-1 font-bold" id="restCountBadge">28/50</span>
+                            </div>
+                            <button onclick="generateShareURL()" class="text-[11px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-200 active:scale-95 transition-all">
+                                <i data-lucide="link" class="w-3.5 h-3.5"></i>分享名單
+                            </button>
+                        </div>
+
+                        <form id="addRestaurantForm" onsubmit="addRestaurant(event)" class="space-y-1.5 mb-2 bg-stone-50 p-2.5 rounded-xl border-2 border-stone-200 shrink-0">
+                            <input type="text" id="newRestName" placeholder="輸入想吃的餐廳名稱..." required class="w-full bg-white border-2 border-stone-400 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 font-bold focus:outline-none focus:border-stone-800">
+                            <div class="grid grid-cols-2 gap-2">
+                                <select id="newRestCategory" class="bg-white border-2 border-stone-400 rounded-lg px-1.5 py-1 text-[11px] font-bold text-stone-900 focus:outline-none focus:border-stone-800">
+                                    <option value="日式">日式</option><option value="台式">台式</option>
+                                    <option value="港式">港式</option><option value="韓式">韓式</option>
+                                    <option value="西式">西式</option><option value="東南亞">東南亞</option>
+                                    <option value="中式">中式</option><option value="健康輕食">健康輕食</option><option value="其他">其他</option>
+                                </select>
+                                <select id="newRestPrice" class="bg-white border-2 border-stone-400 rounded-lg px-1.5 py-1 text-[11px] font-bold text-amber-950 focus:outline-none focus:border-stone-800">
+                                    <option value="$">$ 平價</option><option value="$$">$$ 中等</option><option value="$$$">$$$ 高級</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between pt-1">
+                                <div class="flex items-center space-x-1.5 hidden" id="newRestWeightContainer">
+                                    <span class="text-[11px] text-stone-900 font-black">權重:</span>
+                                    <input type="number" id="newRestWeight" min="1" max="10" value="5" class="w-10 bg-white border-2 border-stone-300 rounded py-0.5 text-center text-xs font-bold no-indicator">
+                                </div>
+                                <button type="submit" class="bg-stone-900 text-white text-[11px] font-black px-4 py-1.5 rounded-lg flex items-center space-x-1 ml-auto active:scale-95 shadow-sm">
+                                    <i data-lucide="plus" class="w-3 h-3 text-amber-300"></i><span>新增</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <div id="restaurantList" class="space-y-1.5 flex-1 overflow-y-auto pr-0.5 pb-2 touch-pan-y">
+                            <!-- 動態渲染清單 -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 頁籤 3: 規則篩選與歷史紀錄 -->
+                <section id="panel-rules" class="tab-panel hidden lg:flex lg:col-span-3 flex-col h-full overflow-hidden space-y-3">
+                    <div class="bg-white border-2 border-stone-800 rounded-2xl p-4 jp-shadow shrink-0">
+                        <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b-2 border-stone-100">
+                            <h3 class="font-black text-sm serif-font tracking-wider text-stone-900 flex items-center gap-1.5"><i data-lucide="sliders-horizontal" class="w-4 h-4"></i>規則篩選</h3>
+                            <button onclick="resetFilters()" class="text-xs font-black text-stone-800 flex items-center gap-0.5 hover:underline"><i data-lucide="refresh-cw" class="w-3 h-3"></i>重設</button>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="block text-xs font-black text-stone-800 mb-1.5">種類篩選</label>
+                            <div class="grid grid-cols-3 gap-1" id="categoryFilterGrid"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="block text-xs font-black text-stone-800 mb-1.5">預算篩選</label>
+                            <div class="grid grid-cols-4 gap-1.5" id="priceFilterGrid">
+                                <button onclick="setPriceFilter('all')" id="pf-all" class="price-filter-btn py-1.5 rounded-lg text-xs font-black border-2 border-stone-800 bg-stone-900 text-white">全部</button>
+                                <button onclick="setPriceFilter('$')" id="pf-$" class="price-filter-btn py-1.5 rounded-lg text-xs font-black border-2 border-stone-300 bg-stone-50 text-stone-800">$</button>
+                                <button onclick="setPriceFilter('$$')" id="pf-$$" class="price-filter-btn py-1.5 rounded-lg text-xs font-black border-2 border-stone-300 bg-stone-50 text-stone-800">$$</button>
+                                <button onclick="setPriceFilter('$$$')" id="pf-$$$" class="price-filter-btn py-1.5 rounded-lg text-xs font-black border-2 border-stone-300 bg-stone-50 text-stone-800">$$$</button>
+                            </div>
+                        </div>
+
+                        <div class="pt-3 border-t-2 border-stone-100 space-y-3">
+                            <label class="flex items-center justify-between cursor-pointer p-2.5 bg-stone-50 border-2 border-stone-200 rounded-xl hover:border-stone-400 transition-colors">
+                                <div class="flex items-center space-x-2.5">
+                                    <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0"><i data-lucide="clock" class="w-4 h-4 text-emerald-700"></i></div>
+                                    <div>
+                                        <p class="text-[13px] font-black text-stone-900 leading-none">避重複吃機制</p>
+                                        <p class="text-[10px] text-stone-500 font-bold mt-1">暫停最近抽中的前3間</p>
+                                    </div>
+                                </div>
+                                <input type="checkbox" id="preventRepeatToggle" class="sr-only peer" onchange="togglePreventRepeat()">
+                                <div class="relative w-9 h-5 bg-stone-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600 shrink-0"></div>
+                            </label>
+
+                            <label class="flex items-center justify-between cursor-pointer p-2.5 bg-stone-50 border-2 border-stone-200 rounded-xl hover:border-stone-400 transition-colors">
+                                <div class="flex items-center space-x-2.5">
+                                    <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><i data-lucide="lock" class="w-4 h-4 text-amber-700"></i></div>
+                                    <div>
+                                        <p class="text-[13px] font-black text-stone-900 leading-none">公平模式 (等比)</p>
+                                        <p class="text-[10px] text-stone-500 font-bold mt-1">強制所有機率完全均等</p>
+                                    </div>
+                                </div>
+                                <input type="checkbox" id="equalProbabilityToggle" class="sr-only peer" checked onchange="toggleEqualProbability()">
+                                <div class="relative w-9 h-5 bg-stone-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-stone-900 shrink-0"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border-2 border-stone-800 rounded-2xl p-4 jp-shadow flex-1 flex flex-col overflow-hidden min-h-0">
+                        <div class="flex items-center justify-between mb-2 pb-1.5 border-b-2 border-stone-100 shrink-0">
+                            <h4 class="font-black text-xs serif-font text-stone-800 flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i>今日歷史</h4>
+                            <button onclick="clearHistory()" class="text-[11px] font-black text-stone-600 hover:text-stone-900">清空</button>
+                        </div>
+                        <div id="historyContainer" class="flex flex-col gap-1.5 flex-1 overflow-y-auto pr-0.5 touch-pan-y">
+                            <!-- 動態載入歷史 -->
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- 搖珠機專屬手機底部導航列 -->
+            <nav class="lg:hidden absolute bottom-0 left-0 right-0 bg-white border-t-2 border-stone-800 flex justify-around items-center z-40 px-1 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] shrink-0" style="height: calc(56px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);">
+                <button id="tab-btn-machine" onclick="switchTab('machine')" class="tab-btn flex flex-col items-center justify-center flex-1 h-full text-stone-900 border-t-4 border-stone-900 font-black transition-all pt-1">
+                    <i data-lucide="compass" class="w-5 h-5 mb-0.5"></i>
+                    <span class="text-[10px] tracking-wider">搖珠抽選</span>
+                </button>
+                <button id="tab-btn-list" onclick="switchTab('list')" class="tab-btn flex flex-col items-center justify-center flex-1 h-full text-stone-400 font-bold hover:text-stone-600 transition-all pt-1">
+                    <i data-lucide="list-todo" class="w-5 h-5 mb-0.5"></i>
+                    <span class="text-[10px] tracking-wider">餐廳名冊</span>
+                </button>
+                <button id="tab-btn-rules" onclick="switchTab('rules')" class="tab-btn flex flex-col items-center justify-center flex-1 h-full text-stone-400 font-bold hover:text-stone-600 transition-all pt-1">
+                    <i data-lucide="sliders-horizontal" class="w-5 h-5 mb-0.5"></i>
+                    <span class="text-[10px] tracking-wider">篩選規則</span>
+                </button>
+            </nav>
+        </div>
+
+
+        <!-- ================================================================================= -->
+        <!-- APP 2: 極速分帳 (Vivienne 風格) -->
+        <!-- ================================================================================= -->
+        <div id="app-split" class="hidden absolute inset-0 overflow-y-auto pt-2 px-3 touch-pan-y z-0" style="padding-bottom: calc(80px + env(safe-area-inset-bottom));">
+            <div class="max-w-md mx-auto space-y-4">
+                
+                <!-- 頂部資訊卡 -->
+                <div class="bg-white border-2 border-stone-900 rounded-[20px] p-4 jp-shadow">
+                    <input type="text" id="sp_customTitle" placeholder="賬單名稱 BILL TITLE" 
+                           class="w-full text-lg sm:text-xl font-black bg-transparent border-b-2 border-transparent focus:border-stone-900 focus:outline-none placeholder-stone-300 uppercase tracking-tight text-stone-900 transition-colors pb-1">
+                    <p id="sp_currentDate" class="text-[11px] text-stone-500 font-bold mt-1.5 mono-font tracking-tight"></p>
+                    
+                    <div class="mt-4 flex items-center justify-between border-t-2 border-dashed border-stone-200 pt-3">
+                        <div class="flex items-center space-x-1.5 bg-rose-50 border-2 border-stone-900 rounded-xl px-2.5 py-1.5 jp-shadow-sm focus-within:bg-rose-100 transition-colors">
+                            <span class="text-[10px] font-black text-rose-600 tracking-wider">PAYME</span>
+                            <input type="text" id="sp_paymeID" placeholder="YourID" oninput="sp_saveUserData()" 
+                                   class="bg-transparent border-none text-xs font-black text-stone-900 focus:outline-none w-16 sm:w-24">
+                        </div>
+                        <button onclick="sp_confirmReset()" class="text-[10px] font-black text-stone-700 border-2 border-stone-900 px-2.5 py-1.5 rounded-xl bg-white hover:bg-stone-100 active:scale-95 jp-shadow-sm transition-all uppercase flex items-center gap-1 shrink-0">
+                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> 清空
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 模式切換按鈕 -->
+                <div class="flex space-x-2">
+                    <button id="sp_btnSplit" onclick="sp_setMode('split')" class="flex-1 py-2.5 border-2 border-stone-900 rounded-xl bg-stone-900 text-white font-black text-[13px] jp-shadow active:scale-95 transition-all flex justify-center items-center gap-1.5">
+                        <i data-lucide="users" class="w-4 h-4"></i> 各自付
+                    </button>
+                    <button id="sp_btnEven" onclick="sp_setMode('even')" class="flex-1 py-2.5 border-2 border-stone-900 rounded-xl bg-white text-stone-900 font-black text-[13px] jp-shadow active:scale-95 transition-all flex justify-center items-center gap-1.5">
+                        <i data-lucide="pie-chart" class="w-4 h-4"></i> 平分
+                    </button>
+                </div>
+
+                <!-- 動態輸入區 -->
+                <div id="sp_mainArea">
+                    <!-- 各自付 (Split) 模式 -->
+                    <div id="sp_splitContainer" class="space-y-4">
+                        <div class="bg-white border-2 border-stone-900 rounded-[20px] p-3.5 jp-shadow">
+                            <h3 class="text-[12px] font-black text-stone-900 uppercase tracking-widest mb-3 serif-font ml-1 flex items-center gap-2">
+                                👤 個人項目
+                            </h3>
+                            <div id="sp_itemList" class="space-y-2 mb-3"></div>
+                            <button onclick="sp_addItem()" class="w-full py-2.5 border-2 border-dashed border-stone-300 text-[11px] text-stone-500 font-black rounded-xl hover:border-stone-900 hover:text-stone-900 transition-all flex items-center justify-center gap-1.5 bg-stone-50">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 加人 ADD PERSON
+                            </button>
+                        </div>
+
+                        <div class="bg-white border-2 border-stone-900 rounded-[20px] p-3.5 jp-shadow">
+                            <h3 class="text-[12px] font-black text-stone-900 uppercase tracking-widest mb-3 serif-font ml-1 flex items-center gap-2">
+                                🍱 共享餐點 <span class="text-[9px] text-stone-400 font-bold bg-stone-100 px-1.5 py-0.5 rounded-full border border-stone-200">免服務費</span>
+                            </h3>
+                            <div id="sp_sharedList" class="space-y-2 mb-3"></div>
+                            <button onclick="sp_addSharedItem()" class="w-full py-2.5 border-2 border-dashed border-stone-300 text-[11px] text-stone-500 font-black rounded-xl hover:border-stone-900 hover:text-stone-900 transition-all flex items-center justify-center gap-1.5 bg-stone-50">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 加共享餐點
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 平分 (Even) 模式 -->
+                    <div id="sp_evenContainer" class="hidden bg-white border-2 border-stone-900 rounded-[20px] p-4 jp-shadow space-y-3">
+                        <h3 class="text-[12px] font-black text-stone-900 uppercase tracking-widest mb-1 serif-font">💰 平分設定</h3>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div class="bg-stone-50 border-2 border-stone-900 rounded-xl p-2.5 focus-within:bg-white transition-colors">
+                                <label class="text-[10px] text-stone-500 font-black uppercase block mb-1">總額 Total</label>
+                                <div class="flex items-center">
+                                    <span class="text-sm font-black text-stone-400 mr-1">$</span>
+                                    <input type="number" id="sp_evenTotal" inputmode="decimal" placeholder="0.0" 
+                                           class="w-full bg-transparent text-base font-black text-stone-900 focus:outline-none" onfocus="this.select()" oninput="sp_calculate()">
+                                </div>
+                            </div>
+                            <div class="bg-stone-50 border-2 border-stone-900 rounded-xl p-2.5 focus-within:bg-white transition-colors">
+                                <label class="text-[10px] text-stone-500 font-black uppercase block mb-1">人數 People</label>
+                                <div class="flex items-center">
+                                    <span class="text-sm font-black text-stone-400 mr-1.5">👥</span>
+                                    <input type="number" id="sp_evenCount" value="2" inputmode="numeric" 
+                                           class="w-full bg-transparent text-base font-black text-stone-900 focus:outline-none" onfocus="this.select()" oninput="sp_calculate()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 進階設定 (服務費與進位) -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="bg-white border-2 border-stone-900 rounded-xl p-2.5 jp-shadow flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black text-stone-500 uppercase tracking-widest">服務費</p>
+                            <div class="flex items-center space-x-1.5 mt-0.5">
+                                <input type="checkbox" id="sp_enableService" checked onchange="sp_calculate()" class="w-3.5 h-3.5 accent-stone-900 rounded">
+                                <span id="sp_serviceLabel" class="text-[11px] font-black text-stone-900">10%</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col space-y-1">
+                            <button onclick="sp_adjustService(1)" class="w-6 h-4 bg-stone-100 border-2 border-stone-900 rounded flex items-center justify-center text-[9px] font-black active:scale-95 text-stone-900">+</button>
+                            <button onclick="sp_adjustService(-1)" class="w-6 h-4 bg-stone-100 border-2 border-stone-900 rounded flex items-center justify-center text-[9px] font-black active:scale-95 text-stone-900">-</button>
+                        </div>
+                    </div>
+                    <div class="bg-white border-2 border-stone-900 rounded-xl p-2.5 jp-shadow flex items-center space-x-2">
+                        <input type="checkbox" id="sp_roundUp" onchange="sp_calculate()" class="w-4 h-4 accent-stone-900 rounded shrink-0">
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black text-stone-500 uppercase tracking-widest truncate">進位 Round</p>
+                            <p class="text-[11px] font-black mt-0.5 text-stone-900 truncate">整數進位</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 總計顯示 -->
+                <div class="bg-stone-900 border-2 border-stone-900 rounded-[20px] p-5 jp-shadow flex justify-between items-center text-white relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 opacity-10 pointer-events-none">
+                        <i data-lucide="receipt" class="w-24 h-24"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <span class="text-base font-black leading-tight block serif-font">總計</span>
+                        <span class="text-stone-400 text-[10px] font-bold uppercase tracking-widest block mt-0.5">Grand Total</span>
+                    </div>
+                    <span id="sp_totalDisplay" class="relative z-10 text-2xl font-black mono-font tracking-tighter">$0.0</span>
+                </div>
+
+                <!-- 複製按鈕 -->
+                <button onclick="sp_copyToWhatsApp()" class="w-full bg-[#25D366] text-stone-900 border-2 border-stone-900 py-3.5 rounded-xl font-black text-[15px] jp-shadow active:scale-95 transition-transform flex items-center justify-center gap-2">
+                    <i data-lucide="copy" class="w-5 h-5"></i>
+                    複製 WHATSAPP 結果
+                </button>
+                
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================================================================================= -->
+    <!-- 腳本區域 (包含 App 切換、搖珠機與分帳邏輯) -->
+    <!-- ================================================================================= -->
+    <script>
+        // ----------------------------------------------------------------------
+        // 【1】全局控制與防回彈機制
+        // ----------------------------------------------------------------------
+        
+        // 防止 Safari 橡皮筋效應，但允許 .touch-pan-y 內部滑動
+        document.body.addEventListener('touchmove', function(e) {
+            if(!e.target.closest('.touch-pan-y')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // 全局 APP 切換
+        function switchGlobalApp(appId) {
+            const btnR = document.getElementById('gbtn-roulette');
+            const btnS = document.getElementById('gbtn-split');
+            const appR = document.getElementById('app-roulette');
+            const appS = document.getElementById('app-split');
+
+            if (appId === 'roulette') {
+                btnR.className = 'px-3 py-1.5 text-[11px] font-black rounded-lg bg-white shadow-sm border border-stone-200 text-stone-900 transition-all flex items-center gap-1';
+                btnS.className = 'px-3 py-1.5 text-[11px] font-black rounded-lg text-stone-500 hover:text-stone-900 transition-all flex items-center gap-1';
+                appR.classList.remove('hidden');
+                appS.classList.add('hidden');
+                document.getElementById('activeCountLabel').innerText = "就緒";
+                updateActiveLabels(); // 更新回搖珠機數據
+            } else {
+                btnS.className = 'px-3 py-1.5 text-[11px] font-black rounded-lg bg-white shadow-sm border border-stone-200 text-stone-900 transition-all flex items-center gap-1';
+                btnR.className = 'px-3 py-1.5 text-[11px] font-black rounded-lg text-stone-500 hover:text-stone-900 transition-all flex items-center gap-1';
+                appS.classList.remove('hidden');
+                appR.classList.add('hidden');
+                document.getElementById('activeCountLabel').innerText = "分帳中";
+            }
+        }
+
+
+        // ----------------------------------------------------------------------
+        // 【2】午餐搖珠機 (原汁原味邏輯)
+        // ----------------------------------------------------------------------
+        const WA_COLORS = [
+            { bg: '#fecdd3', text: '#9f1239', glow: '#f43f5e' },
+            { bg: '#bbf7d0', text: '#14532d', glow: '#22c55e' },
+            { bg: '#fef08a', text: '#713f12', glow: '#eab308' },
+            { bg: '#cffafe', text: '#164e63', glow: '#06b6d4' },
+            { bg: '#e0e7ff', text: '#1e1b4b', glow: '#4f46e5' },
+            { bg: '#ffedd5', text: '#7c2d12', glow: '#f97316' },
+            { bg: '#f5d0fe', text: '#701a75', glow: '#d946ef' },
+            { bg: '#fed7aa', text: '#7c2d12', glow: '#ea580c' }
+        ];
+
+        const USER_RESTAURANTS = [
+            { id: "usr-1", name: "一起食堂 • 台日式便當 (中環店)", category: "台式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-2", name: "Sol-Sot (솔솥)", category: "韓式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-3", name: "一橋拉麵 (中環旗艦店)", category: "日式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-4", name: "馬祖台灣養生湯麵館 (中環)", category: "台式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-5", name: "霸嗎拉麵 (中環店)", category: "日式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-6", name: "La Parrilla Steakhouse Xpress (Soho)", category: "西式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-7", name: "部隊屋 BUDAEOK 부대옥", category: "韓式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-8", name: "BKK Thai Street Food", category: "東南亞", price: "$$", weight: 5, enabled: true },
+            { id: "usr-9", name: "Maru De Sankaku鯛白湯拉麵 Central", category: "日式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-10", name: "Chi Yin House 知延屋", category: "韓式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-11", name: "座銀 SOBA", category: "日式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-12", name: "雞功房", category: "港式", price: "$", weight: 5, enabled: true },
+            { id: "usr-13", name: "Flat Iron Steak (Sheung Wan)", category: "西式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-14", name: "蝦三少", category: "港式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-15", name: "PHO Nhat", category: "東南亞", price: "$", weight: 5, enabled: true },
+            { id: "usr-16", name: "緣屋 (信德中心)", category: "日式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-17", name: "明谷 (信德中心店)", category: "日式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-18", name: "錦麗 (信德中心店)", category: "東南亞", price: "$$", weight: 5, enabled: true },
+            { id: "usr-19", name: "貳號冰室 (中環)", category: "港式", price: "$", weight: 5, enabled: true },
+            { id: "usr-20", name: "貳號冰室 (上環)", category: "港式", price: "$", weight: 5, enabled: true },
+            { id: "usr-21", name: "廿一堂 (中環旗艦店)", category: "日式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-22", name: "泰館 上環店", category: "東南亞", price: "$$", weight: 5, enabled: true },
+            { id: "usr-23", name: "八刀麵館 Eight Cleaver Noodles", category: "中式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-24", name: "餃掂手工餃子專門店", category: "中式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-25", name: "丼造", category: "日式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-26", name: "老爹", category: "港式", price: "$", weight: 5, enabled: true },
+            { id: "usr-27", name: "浦和日本料理", category: "日式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-28", name: "小河內 Little Hanoi", category: "東南亞", price: "$$", weight: 5, enabled: true },
+            { id: "usr-29", name: "新森林焗之專門店 - 中環", category: "港式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-30", name: "權記雲吞麵 (上環店)", category: "中式", price: "$", weight: 5, enabled: true },
+            { id: "usr-31", name: "權記雲吞麵 (中環卑利街)", category: "中式", price: "$", weight: 5, enabled: true },
+            { id: "usr-32", name: "九頭鳥米線 (中環)", category: "中式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-33", name: "Da Hwa Won", category: "韓式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-34", name: "金禾無敵鹽焗雞", category: "中式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-35", name: "健康食品拉麵", category: "健康輕食", price: "$$", weight: 5, enabled: true },
+            { id: "usr-36", name: "LeeLaksa", category: "東南亞", price: "$$", weight: 5, enabled: true },
+            { id: "usr-37", name: "瑞士咖啡室", category: "港式", price: "$", weight: 5, enabled: true },
+            { id: "usr-38", name: "悦蔵", category: "日式", price: "$$$", weight: 5, enabled: true },
+            { id: "usr-39", name: "三一餃子", category: "中式", price: "$$", weight: 5, enabled: true },
+            { id: "usr-40", name: "加東叻沙蝦麵", category: "東南亞", price: "$$", weight: 5, enabled: true },
+            { id: "usr-41", name: "施心畢老撾餐廳", category: "東南亞", price: "$$", weight: 5, enabled: true }
+        ];
+
+        let restaurants = JSON.parse(JSON.stringify(USER_RESTAURANTS)); 
+        const MAX_RESTAURANTS = 50; 
+        let history = []; 
+        let filterCategory = 'all';
+        let filterPrice = 'all';
+        let excludeRecentlyEaten = false;
+        let isMuted = false;
+        let equalProbabilityMode = true; 
+
+        // 音效系統
+        let audioCtx = null;
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+
+        function playTickSound() {
+            if (isMuted) return; initAudio();
+            try {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.04);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.04);
+            } catch(e) {}
+        }
+
+        function playDropSound(volume = 0.2) {
+            if (isMuted) return; initAudio();
+            try {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.type = 'sine'; osc.frequency.setValueAtTime(260, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.08);
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+            } catch(e) {}
+        }
+
+        function playOrinChime() {
+            if (isMuted) return; initAudio();
+            try {
+                const now = audioCtx.currentTime;
+                const freqs = [440, 659.25, 1100, 1567.98]; const gains = [0.15, 0.08, 0.04, 0.02];
+                freqs.forEach((f, idx) => {
+                    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+                    osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(f, now);
+                    gainNode.gain.setValueAtTime(gains[idx], now); gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 3.0 - (idx * 0.4));
+                    osc.start(now); osc.stop(now + 3.2);
+                });
+            } catch(e) {}
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const muteIcon = document.getElementById('muteIcon');
+            muteIcon.setAttribute('data-lucide', isMuted ? 'volume-x' : 'volume-2');
+            lucide.createIcons();
+        }
+
+        // 搖珠機內部 Tab 切換 (僅手機版可見)
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-stone-900', 'border-t-4', 'border-stone-900', 'font-black');
+                btn.classList.add('text-stone-400', 'font-bold');
+            });
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-stone-400', 'font-bold');
+                activeBtn.classList.add('text-stone-900', 'border-t-4', 'border-stone-900', 'font-black');
+            }
+
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+            const activePanel = document.getElementById(`panel-${tabId}`);
+            if (activePanel) {
+                activePanel.classList.remove('hidden');
+                if (tabId === 'machine') activePanel.classList.add('flex');
+            }
+        }
+
+        function getFilteredRestaurants() {
+            return restaurants.filter(item => {
+                if (!item.enabled) return false;
+                if (filterCategory !== 'all' && item.category !== filterCategory) return false;
+                if (filterPrice !== 'all' && item.price !== filterPrice) return false;
+                if (excludeRecentlyEaten && history.length > 0) {
+                    const recentThree = history.slice(-3).map(h => h.name);
+                    if (recentThree.includes(item.name)) return false;
+                }
+                return true;
+            });
+        }
+
+        function checkURLParamsAndLoad() {
+            const params = new URLSearchParams(window.location.search);
+            const sharedData = params.get('list');
+            if (sharedData) {
+                try {
+                    let decoded = null;
+                    const decompressedStr = LZString.decompressFromEncodedURIComponent(sharedData);
+                    if (decompressedStr) {
+                        decoded = JSON.parse(decompressedStr);
+                    } else {
+                        const fixedBase64 = sharedData.replace(/ /g, '+');
+                        decoded = JSON.parse(decodeURIComponent(atob(fixedBase64)));
+                    }
+
+                    if (Array.isArray(decoded) && decoded.length > 0) {
+                        if (Array.isArray(decoded[0])) {
+                             restaurants = decoded.map(item => ({
+                                 id: 'r-' + Math.random().toString(36).substr(2, 5),
+                                 name: item[0], category: item[1], price: item[2], weight: item[3], enabled: item[4] === 1
+                             })).slice(0, MAX_RESTAURANTS);
+                        } else if (decoded[0].name) {
+                             restaurants = decoded.slice(0, MAX_RESTAURANTS);
+                        }
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        setTimeout(() => alertModal("🌸 成功載入朋友分享的餐廳名冊！"), 500);
+                    } else { throw new Error("Invalid Format"); }
+                } catch(e) {
+                    alertModal("❌ 分享網址已失效或損壞，已為您載入預設名單。");
+                }
+            }
+        }
+
+        function generateShareURL() {
+            try {
+                const compactList = restaurants.map(r => [r.name, r.category, r.price, r.weight, r.enabled ? 1 : 0]);
+                const jsonStr = JSON.stringify(compactList);
+                const compressed = LZString.compressToEncodedURIComponent(jsonStr);
+                const encodedSafeUrl = encodeURIComponent(compressed);
+                const url = window.location.origin + window.location.pathname + "?list=" + encodedSafeUrl;
+
+                const tempInput = document.createElement("input");
+                tempInput.value = url;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand("copy");
+                document.body.removeChild(tempInput);
+
+                alertModal("🔗 <b>專屬分享網址已複製到剪貼簿！</b><br><br><span class='text-[11px] font-bold text-stone-500'>可以直接去 WhatsApp 貼上給朋友，對方一按就會自動載入這份名單囉！</span>");
+            } catch (e) {
+                alertModal("❌ 產生網址失敗，請檢查名單內容是否有特殊字元。");
+            }
+        }
+
+        // --- 核心 Canvas 搖珠機模塊 ---
+        const canvas = document.getElementById('machineCanvas');
+        const ctx = canvas.getContext('2d');
+        let spinAngle = 0; let spinSpeed = 0; let isSpinning = false;
+        let particles = []; let dropBean = null; 
+        const INTERNAL_W = 800; const INTERNAL_H = 720;
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < 20; i++) {
+                const colorObj = WA_COLORS[i % WA_COLORS.length];
+                particles.push({
+                    x: (Math.random() - 0.5) * 100, y: (Math.random() - 0.5) * 100,
+                    vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
+                    radius: 16, color: colorObj.bg, glow: colorObj.glow, text_color: colorObj.text
+                });
+            }
+        }
+
+        function draw3DBean(x, y, r, bgColor, glowColor) {
+            ctx.save();
+            const grad = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.05, x, y, r);
+            grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.15, '#ffffff'); 
+            grad.addColorStop(0.35, glowColor); grad.addColorStop(0.85, bgColor); 
+            grad.addColorStop(1, darkenColor(bgColor, 30)); 
+            ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fillStyle = grad; ctx.fill();
+            
+            ctx.beginPath(); ctx.arc(x, y, r - 1.5, 0.25 * Math.PI, 0.75 * Math.PI);
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2.5; ctx.stroke();
+            ctx.restore();
+        }
+
+        function darkenColor(hex, percent) {
+            let num = parseInt(hex.replace("#",""),16), amt = Math.round(2.55 * percent),
+            R = (num >> 16) - amt, G = (num >> 8 & 0x00FF) - amt, B = (num & 0x0000FF) - amt;
+            return "#" + (0x1000000 + (R<0?0:R>255?255:R)*0x10000 + (G<0?0:G>255?255:G)*0x100 + (B<0?0:B>255?255:B)).toString(16).slice(1);
+        }
+
+        function drawOctagon(x, y, r, angle) {
+            ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                let a = angle + (i * Math.PI / 4);
+                let px = x + r * Math.cos(a); let py = y + r * Math.sin(a);
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        }
+
+        function drawMachine() {
+            ctx.clearRect(0, 0, INTERNAL_W, INTERNAL_H);
+            const cx = INTERNAL_W / 2; const cy = 310; const radius = 240; 
+            
+            ctx.save();
+            ctx.strokeStyle = '#8c7865'; ctx.lineWidth = 20; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.beginPath(); ctx.moveTo(cx - radius * 0.85, cy + radius * 1.25); ctx.lineTo(cx, cy); ctx.lineTo(cx + radius * 0.85, cy + radius * 1.25); ctx.stroke();
+            ctx.lineWidth = 32; ctx.strokeStyle = '#6e5a48';
+            ctx.beginPath(); ctx.moveTo(cx - radius * 1.15, cy + radius * 1.25); ctx.lineTo(cx + radius * 1.15, cy + radius * 1.25); ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            const trayY = cy + radius * 1.15; const trayW = radius * 1.3; const trayH = 60;
+            const trayGrad = ctx.createLinearGradient(cx - trayW/2, trayY, cx + trayW/2, trayY + trayH);
+            trayGrad.addColorStop(0, '#7d6854'); trayGrad.addColorStop(1, '#5e4e3e');
+            ctx.fillStyle = trayGrad; ctx.strokeStyle = '#42372c'; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.roundRect(cx - trayW/2, trayY, trayW, trayH, 16); ctx.fill(); ctx.stroke();
+            
+            ctx.fillStyle = 'rgba(40, 30, 20, 0.4)'; 
+            ctx.beginPath(); ctx.roundRect(cx - trayW/2 + 16, trayY + 10, trayW - 32, trayH - 20, 8); ctx.fill();
+            
+            ctx.strokeStyle = '#54463a'; ctx.lineWidth = 10; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(cx - 32, cy + radius * 0.5); ctx.quadraticCurveTo(cx - 32, cy + radius * 0.95, cx - 48, trayY + 12);
+            ctx.moveTo(cx + 32, cy + radius * 0.5); ctx.quadraticCurveTo(cx + 32, cy + radius * 0.95, cx + 48, trayY + 12); ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            drawOctagon(0, 0, radius, spinAngle);
+            const woodGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, radius);
+            woodGrad.addColorStop(0, '#fefdfb'); woodGrad.addColorStop(0.85, '#ede6da'); woodGrad.addColorStop(1, '#dfd6c6');
+            ctx.fillStyle = woodGrad; ctx.fill();
+            ctx.strokeStyle = '#5c4d3c'; ctx.lineWidth = 14; ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(92, 77, 60, 0.25)'; ctx.lineWidth = 4;
+            for (let i = 0; i < 4; i++) {
+                let a = spinAngle + (i * Math.PI / 4);
+                ctx.beginPath(); ctx.moveTo(-radius * Math.cos(a), -radius * Math.sin(a)); ctx.lineTo(radius * Math.cos(a), radius * Math.sin(a)); ctx.stroke();
+            }
+
+            for (let i = 0; i < 8; i++) {
+                let a = spinAngle + (i * Math.PI / 4);
+                ctx.beginPath(); ctx.arc(radius * 0.92 * Math.cos(a), radius * 0.92 * Math.sin(a), 8, 0, 2 * Math.PI);
+                ctx.fillStyle = '#421f11'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+            }
+
+            ctx.beginPath(); ctx.arc(0, 0, radius * 0.65, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.72)'; ctx.fill(); ctx.strokeStyle = '#5c4d3c'; ctx.lineWidth = 6; ctx.stroke();
+
+            particles.forEach(p => {
+                if (spinSpeed > 0.02) {
+                    p.vx += (Math.random() - 0.5) * spinSpeed * 40; p.vy += (Math.random() - 0.5) * spinSpeed * 40;
+                } else { p.vy += 1.5; }
+                p.vx *= 0.88; p.vy *= 0.88; p.x += p.vx; p.y += p.vy;
+                
+                const dist = Math.sqrt(p.x * p.x + p.y * p.y); const maxDist = radius * 0.58;
+                if (dist > maxDist) {
+                    const nx = p.x / dist; const ny = p.y / dist; const dot = p.vx * nx + p.vy * ny;
+                    p.vx = (p.vx - 2 * dot * nx) * 0.5; p.vy = (p.vy - 2 * dot * ny) * 0.5;
+                    p.x = nx * maxDist; p.y = ny * maxDist;
+                }
+                draw3DBean(p.x, p.y, p.radius, p.color, p.glow);
+            });
+
+            ctx.beginPath(); ctx.arc(0, 0, 24, 0, 2 * Math.PI); ctx.fillStyle = '#42372c'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.stroke();
+            ctx.save();
+            ctx.rotate(spinAngle * 1.5);
+            ctx.fillStyle = '#614e3f'; ctx.beginPath(); ctx.roundRect(-6, -8, 50, 16, 8); ctx.fill();
+            ctx.beginPath(); ctx.arc(42, 0, 12, 0, 2 * Math.PI); ctx.fillStyle = '#42372c'; ctx.fill();
+            ctx.beginPath(); ctx.arc(42, 0, 8, 0, 2 * Math.PI);
+            const handleGrad = ctx.createLinearGradient(38, -5, 46, 5); handleGrad.addColorStop(0, '#ffffff'); handleGrad.addColorStop(1, '#a19182');
+            ctx.fillStyle = handleGrad; ctx.fill();
+            ctx.restore();
+            ctx.restore();
+
+            if (dropBean) {
+                dropBean.vy += 2.0; dropBean.x += dropBean.vx; dropBean.y += dropBean.vy;
+                const landingY = cy + radius * 1.15 + 60 - 16; 
+                if (dropBean.y + dropBean.radius >= landingY) {
+                    dropBean.y = landingY - dropBean.radius; dropBean.vy = -dropBean.vy * 0.45; dropBean.vx *= 0.6;
+                    if (Math.abs(dropBean.vy) > 2.0) playDropSound(0.3);
+                }
+                const trayLimit = radius * 0.65 - 16; 
+                if (dropBean.x < cx - trayLimit + dropBean.radius) { dropBean.x = cx - trayLimit + dropBean.radius; dropBean.vx *= -0.6; }
+                if (dropBean.x > cx + trayLimit - dropBean.radius) { dropBean.x = cx + trayLimit - dropBean.radius; dropBean.vx *= -0.6; }
+                
+                draw3DBean(dropBean.x, dropBean.y, dropBean.radius, dropBean.color, dropBean.glow);
+            }
+        }
+
+        function spin() {
+            if (isSpinning) return; initAudio();
+            const list = getFilteredRestaurants();
+            if (list.length === 0) { alertModal("無符合篩選條件的餐廳，請檢查設定！"); return; }
+            isSpinning = true;
+            
+            const spinBtn = document.getElementById('spinBtn');
+            spinBtn.disabled = true; spinBtn.classList.add('opacity-50', 'pointer-events-none');
+            spinBtn.classList.remove('hidden');
+
+            const resultCard = document.getElementById('resultCard');
+            resultCard.classList.add('scale-95', 'opacity-0', 'pointer-events-none', 'hidden');
+            resultCard.classList.remove('scale-100', 'opacity-100', 'z-20');
+            
+            dropBean = null; 
+            let start = null; const duration = 2500; const totalRounds = 8 * Math.PI * 2; let lastTickAngle = 0;
+
+            function animate(timestamp) {
+                if (!start) start = timestamp;
+                const elapsed = timestamp - start; const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3);
+                spinAngle = totalRounds * ease; spinSpeed = (1 - progress) * 0.52; 
+                
+                if (spinAngle - lastTickAngle > Math.PI / 4) { playTickSound(); lastTickAngle = spinAngle; }
+                drawMachine();
+
+                if (elapsed < duration) requestAnimationFrame(animate);
+                else {
+                    let winner;
+                    if (equalProbabilityMode) {
+                        winner = list[Math.floor(Math.random() * list.length)];
+                    } else {
+                        const totalWeight = list.reduce((sum, item) => sum + item.weight, 0);
+                        let randomValue = Math.random() * totalWeight; winner = list[0];
+                        for (const item of list) { randomValue -= item.weight; if (randomValue <= 0) { winner = item; break; } }
+                    }
+                    triggerBeanDrop(winner);
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function triggerBeanDrop(winner) {
+            const cx = INTERNAL_W / 2; const cy = 310; const radius = 240;
+            const colorIdx = Math.abs(winner.name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % WA_COLORS.length;
+            const winnerColor = WA_COLORS[colorIdx];
+
+            dropBean = {
+                x: cx, y: cy + radius * 0.35, vx: (Math.random() - 0.5) * 8, vy: 2, 
+                radius: 36, color: winnerColor.bg, glow: winnerColor.glow, text_color: winnerColor.text
+            };
+            playDropSound(0.4);
+
+            let dropStart = null;
+            function animateDrop(timestamp) {
+                if (!dropStart) dropStart = timestamp;
+                const elapsed = timestamp - dropStart;
+                drawMachine();
+                if (elapsed < 900) requestAnimationFrame(animateDrop);
+                else { showResult(winner, winnerColor); isSpinning = false; }
+            }
+            requestAnimationFrame(animateDrop);
+        }
+
+        function showResult(winner, colorObj) {
+            playOrinChime();
+            document.getElementById('spinBtn').classList.add('hidden');
+            document.getElementById('resultName').innerText = winner.name;
+            document.getElementById('resultCategory').innerText = winner.category;
+            document.getElementById('resultPrice').innerText = `預算：${winner.price}`;
+            
+            const mapBtn = document.getElementById('mapLinkBtn');
+            const encodedName = encodeURIComponent(winner.name + " 香港");
+            mapBtn.href = `https://www.google.com/maps/search/?api=1&query=${encodedName}`;
+
+            const rCtx = document.getElementById('resultBeanCanvas').getContext('2d');
+            rCtx.clearRect(0, 0, 48, 48);
+            const r = 20; const x = 24, y = 24;
+            const grad = rCtx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.05, x, y, r);
+            grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.15, '#ffffff');
+            grad.addColorStop(0.35, colorObj.glow); grad.addColorStop(0.85, colorObj.bg); grad.addColorStop(1, darkenColor(colorObj.bg, 30));
+            rCtx.beginPath(); rCtx.arc(x, y, r, 0, 2 * Math.PI); rCtx.fillStyle = grad; rCtx.fill();
+            rCtx.beginPath(); rCtx.arc(x, y, r - 1.5, 0.25 * Math.PI, 0.75 * Math.PI); rCtx.strokeStyle = 'rgba(255,255,255,0.6)'; rCtx.lineWidth = 2.5; rCtx.stroke();
+
+            const card = document.getElementById('resultCard');
+            card.classList.remove('hidden');
+            setTimeout(() => { card.classList.remove('scale-95', 'opacity-0', 'pointer-events-none'); card.classList.add('scale-100', 'opacity-100', 'z-20'); }, 10);
+            window.latestWinner = winner;
+        }
+
+        function lockSelection() {
+            if (!window.latestWinner) return; const winner = window.latestWinner;
+            const time = new Date().toLocaleTimeString('zh-Hant', { hour: '2-digit', minute: '2-digit' });
+            history.push({ name: winner.name, time: time }); updateHistoryUI();
+            alertModal(`🌸 已鎖定午餐：【${winner.name}】！吃飽點喔！`);
+            
+            const card = document.getElementById('resultCard');
+            card.classList.add('scale-95', 'opacity-0', 'pointer-events-none', 'hidden'); card.classList.remove('scale-100', 'opacity-100', 'z-20');
+            const spinBtn = document.getElementById('spinBtn');
+            spinBtn.classList.remove('hidden', 'opacity-50', 'pointer-events-none'); spinBtn.disabled = false;
+            window.latestWinner = null;
+        }
+
+        function toggleEqualProbability() {
+            equalProbabilityMode = document.getElementById('equalProbabilityToggle').checked;
+            const weightHeader = document.getElementById('newRestWeightContainer');
+            if (equalProbabilityMode) weightHeader.classList.add('opacity-30', 'pointer-events-none');
+            else weightHeader.classList.remove('opacity-30', 'pointer-events-none');
+            renderRestaurantList(); updateActiveLabels();
+        }
+
+        function updateActiveLabels() {
+            const activeList = getFilteredRestaurants();
+            const countLabel = document.getElementById('activeCountLabel');
+            if(document.getElementById('app-roulette').classList.contains('hidden')) {
+                // 不在搖珠頁面，保留文字
+            } else {
+                countLabel.innerText = `符合：${activeList.length} 間${equalProbabilityMode ? " (等比)" : ""}`;
+            }
+            document.getElementById('activeCategoryLabel').innerText = filterCategory === 'all' ? '全部種類' : filterCategory;
+            document.getElementById('activePriceLabel').innerText = filterPrice === 'all' ? '所有預算' : filterPrice;
+        }
+
+        function updateCategoryFilterUI() {
+            const categories = ['all', ...new Set(restaurants.map(r => r.category))];
+            const grid = document.getElementById('categoryFilterGrid'); grid.innerHTML = '';
+            categories.forEach(cat => {
+                const isSelected = filterCategory === cat;
+                const btn = document.createElement('button');
+                btn.className = `py-1.5 rounded-lg text-xs font-black transition-all border-2 ${isSelected ? 'bg-stone-900 text-white border-stone-800' : 'bg-stone-50 text-stone-800 border-stone-300'}`;
+                btn.innerText = cat === 'all' ? '全部' : cat;
+                btn.onclick = () => { filterCategory = cat; updateCategoryFilterUI(); updateActiveLabels(); };
+                grid.appendChild(btn);
+            });
+        }
+
+        function setPriceFilter(price) {
+            filterPrice = price;
+            document.querySelectorAll('.price-filter-btn').forEach(btn => btn.className = "price-filter-btn py-1.5 rounded-lg text-xs font-black border-2 border-stone-300 bg-stone-50 text-stone-800");
+            const activeBtn = document.getElementById(`pf-${price}`);
+            if (activeBtn) activeBtn.className = "price-filter-btn py-1.5 rounded-lg text-xs font-black border-2 border-stone-800 bg-stone-900 text-white";
+            updateActiveLabels();
+        }
+
+        function togglePreventRepeat() { excludeRecentlyEaten = document.getElementById('preventRepeatToggle').checked; updateActiveLabels(); }
+
+        function resetFilters() {
+            filterCategory = 'all'; filterPrice = 'all'; excludeRecentlyEaten = false;
+            document.getElementById('preventRepeatToggle').checked = false;
+            updateCategoryFilterUI(); setPriceFilter('all'); updateActiveLabels();
+        }
+
+        function renderRestaurantList() {
+            const countBadge = document.getElementById('restCountBadge');
+            countBadge.innerText = `${restaurants.length}/${MAX_RESTAURANTS}`;
+            if(restaurants.length >= MAX_RESTAURANTS) {
+                countBadge.classList.replace('bg-stone-200', 'bg-rose-100'); countBadge.classList.replace('text-stone-600', 'text-rose-600');
+            } else {
+                countBadge.classList.replace('bg-rose-100', 'bg-stone-200'); countBadge.classList.replace('text-rose-600', 'text-stone-600');
+            }
+
+            const container = document.getElementById('restaurantList'); container.innerHTML = '';
+            if (restaurants.length === 0) {
+                container.innerHTML = `<div class="text-center py-6 text-[11px] text-stone-800 font-bold italic">請在上方新增或載入範本</div>`; return;
+            }
+            restaurants.forEach((item, index) => {
+                const cardColor = WA_COLORS[index % WA_COLORS.length];
+                const card = document.createElement('div');
+                card.className = `flex items-center justify-between p-2.5 rounded-xl border-2 ${item.enabled ? 'bg-white border-stone-300 shadow-sm' : 'bg-stone-50 opacity-50 border-stone-200'}`;
+                const weightSection = equalProbabilityMode ? `<span class="text-[10px] text-stone-700 font-black bg-stone-100 px-2.5 py-0.5 rounded border border-stone-300">1/N</span>`
+                    : `<div class="flex items-center space-x-1.5 bg-stone-50 px-1.5 py-0.5 rounded border border-stone-300">
+                        <span class="text-[10px] text-stone-500 font-bold">權:</span><span class="text-[11px] font-black w-2.5 text-center">${item.weight}</span>
+                        <div class="flex flex-col"><button onclick="adjustWeight('${item.id}', 1)" class="text-[7px] font-black leading-none hover:text-stone-900">▲</button><button onclick="adjustWeight('${item.id}', -1)" class="text-[7px] font-black leading-none hover:text-stone-900 mt-0.5">▼</button></div></div>`;
+                card.innerHTML = `
+                    <div class="flex items-center space-x-2.5 flex-1 min-w-0">
+                        <input type="checkbox" ${item.enabled ? 'checked' : ''} onchange="toggleRestaurant('${item.id}')" class="rounded border-stone-400 h-4 w-4">
+                        <div class="truncate pr-1">
+                            <h5 class="text-xs font-black serif-font ${!item.enabled && 'text-stone-500 line-through'}">${item.name}</h5>
+                            <div class="flex items-center space-x-1.5 mt-0.5">
+                                <span class="text-[9px] px-1.5 py-0.5 rounded font-black border" style="background-color:${cardColor.bg};color:${cardColor.text};border-color:${cardColor.glow}">${item.category}</span>
+                                <span class="text-[10px] text-amber-900 font-black">${item.price}</span>
+                            </div></div></div>
+                    <div class="flex items-center space-x-2 shrink-0">${weightSection}<button onclick="deleteRestaurant('${item.id}')" class="text-stone-400 hover:text-rose-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>`;
+                container.appendChild(card);
+            });
+            lucide.createIcons(); updateCategoryFilterUI(); updateActiveLabels();
+        }
+
+        function addRestaurant(e) {
+            e.preventDefault();
+            if (restaurants.length >= MAX_RESTAURANTS) {
+                alertModal(`❌ 名單數量已達上限 (${MAX_RESTAURANTS}間)！<br><br><span class='text-[11px] font-normal'>為了確保能成功產生分享網址，請先刪除部份舊餐廳再新增。</span>`);
+                return;
+            }
+            const name = document.getElementById('newRestName').value.trim();
+            if (!name || restaurants.some(r => r.name === name)) { alertModal(name ? "這家餐廳已在清單中囉！" : "名稱不能空白！"); return; }
+            
+            const newId = 'r-' + Math.random().toString(36).substr(2, 5);
+            restaurants.unshift({ id: newId, name, category: document.getElementById('newRestCategory').value, price: document.getElementById('newRestPrice').value, weight: Math.max(1, Math.min(10, parseInt(document.getElementById('newRestWeight').value) || 5)), enabled: true });
+            document.getElementById('newRestName').value = ''; renderRestaurantList();
+        }
+
+        function toggleRestaurant(id) { const item = restaurants.find(r => r.id === id); if (item) { item.enabled = !item.enabled; renderRestaurantList(); } }
+        function adjustWeight(id, change) { if (equalProbabilityMode) return; const item = restaurants.find(r => r.id === id); if (item) { item.weight = Math.max(1, Math.min(10, item.weight + change)); renderRestaurantList(); } }
+        function deleteRestaurant(id) { restaurants = restaurants.filter(r => r.id !== id); renderRestaurantList(); }
+
+        function updateHistoryUI() {
+            const container = document.getElementById('historyContainer'); container.innerHTML = '';
+            if (history.length === 0) { container.innerHTML = `<span class="text-[11px] text-stone-700 font-bold italic py-1">尚無歷史決定</span>`; return; }
+            [...history].reverse().forEach(item => {
+                const chip = document.createElement('div');
+                chip.className = "flex items-center justify-between bg-stone-50 border-2 border-stone-200 px-3 py-1.5 rounded-lg text-[11px] w-full";
+                chip.innerHTML = `<span class="font-bold truncate">${item.name}</span><span class="text-[10px] text-stone-600 font-bold shrink-0">${item.time}</span>`; container.appendChild(chip);
+            });
+        }
+        function clearHistory() { history = []; updateHistoryUI(); }
+
+        function alertModal(msg) {
+            const overlay = document.createElement('div');
+            overlay.className = "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-xs transition-opacity animate-[fadeIn_0.2s_ease-out]";
+            const card = document.createElement('div');
+            card.className = "bg-white border-2 border-stone-900 rounded-3xl p-5 shadow-2xl max-w-[260px] w-full text-center jp-shadow animate-[popIn_0.2s_ease-out]";
+            card.innerHTML = `<p class="text-[11px] text-stone-700 mb-2.5 tracking-widest font-black serif-font">VIVIENNE 提示</p><p class="text-[13px] font-bold text-stone-900 mb-5 leading-snug">${msg}</p><button class="px-6 py-2.5 bg-stone-900 text-white font-black text-xs rounded-xl active:scale-95 jp-shadow-sm w-full border-2 border-stone-900 transition-all" onclick="this.closest('.fixed').remove()">知道啦</button>`;
+            overlay.appendChild(card); document.body.appendChild(overlay);
+        }
+
+        // 初始化設定
+        window.addEventListener('load', () => {
+            lucide.createIcons();
+            if (equalProbabilityMode) document.getElementById('newRestWeightContainer').classList.add('opacity-30', 'pointer-events-none');
+            checkURLParamsAndLoad();
+            initParticles();
+            drawMachine();
+            renderRestaurantList();
+            updateHistoryUI();
+            sp_init(); // 初始化分帳
+        });
+
+
+        // ----------------------------------------------------------------------
+        // 【3】極速分帳 (Split Bill) 邏輯
+        // ----------------------------------------------------------------------
+        let sp_service = 10;
+        let sp_mode = 'split';
+
+        function sp_init() {
+            const now = new Date();
+            document.getElementById('sp_currentDate').innerText = now.toLocaleString('zh-HK');
+            if(localStorage.getItem('sp_paymeID')) document.getElementById('sp_paymeID').value = localStorage.getItem('sp_paymeID');
+            const savedNames = JSON.parse(localStorage.getItem('sp_savedNames') || '[]');
+            const initialCount = savedNames.length > 0 ? Math.max(savedNames.length, 4) : 4;
+            for(let i=0; i < initialCount; i++) sp_addItem(savedNames[i] || '', false);
+        }
+
+        function sp_addItem(name = '', focus = true) {
+            const list = document.getElementById('sp_itemList');
+            const row = document.createElement('div');
+            row.className = 'flex items-center space-x-1.5 animate-[fadeIn_0.2s_ease-out]';
+            row.innerHTML = `
+                <input type="text" value="${name}" placeholder="姓名 Name" oninput="sp_saveUserData()" class="sp-name flex-1 min-w-0 bg-stone-50 border-2 border-stone-900 rounded-xl px-2.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white transition-colors h-[38px]">
+                <div class="flex items-center bg-stone-50 border-2 border-stone-900 rounded-xl px-1.5 py-2 flex-shrink-0 focus-within:bg-white transition-colors h-[38px]">
+                    <span class="text-[10px] font-black text-stone-400 mr-0.5">$</span>
+                    <input type="number" step="any" inputmode="decimal" placeholder="0" class="sp-price w-12 bg-transparent text-xs text-right font-black text-stone-900 focus:outline-none" onfocus="this.select()" oninput="sp_calculate()">
+                </div>
+                <button onclick="this.parentElement.remove(); sp_calculate(); sp_saveUserData();" class="w-10 h-[38px] flex items-center justify-center border-2 border-stone-900 bg-white hover:bg-rose-50 text-stone-400 hover:text-rose-500 rounded-xl active:scale-95 flex-shrink-0 transition-colors">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>`;
+            list.appendChild(row);
+            lucide.createIcons({root: row});
+            if (focus) row.querySelector('.sp-name').focus();
+        }
+
+        function sp_addSharedItem() {
+            const list = document.getElementById('sp_sharedList');
+            const row = document.createElement('div');
+            row.className = 'flex items-center space-x-1.5 animate-[fadeIn_0.2s_ease-out]';
+            row.innerHTML = `
+                <input type="text" placeholder="餐點名稱" class="sp-shared-name flex-1 min-w-0 bg-stone-50 border-2 border-stone-900 rounded-xl px-2.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white transition-colors h-[38px]">
+                <div class="flex items-center bg-stone-50 border-2 border-stone-900 rounded-xl px-1.5 py-2 flex-shrink-0 focus-within:bg-white transition-colors h-[38px]">
+                    <span class="text-[10px] font-black text-stone-400 mr-0.5">$</span>
+                    <input type="number" step="any" inputmode="decimal" placeholder="0" class="sp-shared-price w-12 bg-transparent text-xs text-right font-black text-stone-900 focus:outline-none" onfocus="this.select()" oninput="sp_calculate()">
+                </div>
+                <button onclick="this.parentElement.remove(); sp_calculate();" class="w-10 h-[38px] flex items-center justify-center border-2 border-stone-900 bg-white hover:bg-rose-50 text-stone-400 hover:text-rose-500 rounded-xl active:scale-95 flex-shrink-0 transition-colors">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>`;
+            list.appendChild(row);
+            lucide.createIcons({root: row});
+            row.querySelector('.sp-shared-name').focus();
+        }
+
+        function sp_saveUserData() {
+            localStorage.setItem('sp_paymeID', document.getElementById('sp_paymeID').value);
+            const names = Array.from(document.querySelectorAll('.sp-name')).map(input => input.value).filter(n => n.trim() !== '');
+            localStorage.setItem('sp_savedNames', JSON.stringify(names));
+        }
+
+        function sp_calculate() {
+            let pTotal = 0, sTotal = 0;
+            const isSvc = document.getElementById('sp_enableService').checked;
+            const ratio = isSvc ? (1 + sp_service / 100) : 1;
+
+            if (sp_mode === 'split') {
+                document.querySelectorAll('.sp-price').forEach(i => pTotal += (parseFloat(i.value) || 0) * ratio);
+                document.querySelectorAll('.sp-shared-price').forEach(i => sTotal += parseFloat(i.value) || 0);
+            } else {
+                pTotal = (parseFloat(document.getElementById('sp_evenTotal').value) || 0) * ratio;
+                sTotal = 0;
+            }
+            
+            let grand = pTotal + sTotal;
+            grand = document.getElementById('sp_roundUp').checked ? Math.ceil(grand) : Math.round(grand * 10) / 10;
+            document.getElementById('sp_totalDisplay').innerText = `$${grand.toLocaleString('en-US', {minimumFractionDigits: 1})}`;
+            return { pTotal, sTotal, grand };
+        }
+
+        function sp_setMode(mode) {
+            sp_mode = mode;
+            document.getElementById('sp_splitContainer').classList.toggle('hidden', mode !== 'split');
+            document.getElementById('sp_evenContainer').classList.toggle('hidden', mode !== 'even');
+            
+            const btnS = document.getElementById('sp_btnSplit');
+            const btnE = document.getElementById('sp_btnEven');
+            
+            if (mode === 'split') {
+                btnS.className = "flex-1 py-2.5 border-2 border-stone-900 rounded-xl bg-stone-900 text-white font-black text-[13px] jp-shadow active:scale-95 transition-all flex justify-center items-center gap-1.5";
+                btnE.className = "flex-1 py-2.5 border-2 border-stone-900 rounded-xl bg-white text-stone-900 font-black text-[13px] jp-shadow active:scale-95 transition-all flex justify-center items-center gap-1.5";
+            } else {
+                btnE.className = "flex-1 py-2.5 border-2 border-stone-900 rounded-xl bg-stone-900 text-white font-black text-[13px] jp-shadow active:scale-95 transition-all flex justify-center items-center gap-1.5";
+                btnS.className = "flex-1 py-2.5 border-2 border-stone-900 rounded-xl bg-white text-stone-900 font-black text-[13px] jp-shadow active:scale-95 transition-all flex justify-center items-center gap-1.5";
+            }
+            sp_calculate();
+        }
+
+        function sp_adjustService(val) {
+            sp_service = Math.max(0, sp_service + val);
+            document.getElementById('sp_serviceLabel').innerText = sp_service + '%';
+            sp_calculate();
+        }
+
+        function sp_confirmReset() {
+            const overlay = document.createElement('div');
+            overlay.className = "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-xs transition-opacity animate-[fadeIn_0.2s_ease-out]";
+            const card = document.createElement('div');
+            card.className = "bg-white border-2 border-stone-900 rounded-3xl p-6 shadow-2xl max-w-[280px] w-full text-center jp-shadow animate-[popIn_0.2s_ease-out]";
+            card.innerHTML = `
+                <div class="w-12 h-12 rounded-full bg-rose-100 border-2 border-stone-900 text-rose-500 mx-auto flex items-center justify-center text-xl mb-4 jp-shadow-sm">⚠️</div>
+                <h3 class="text-base font-black text-stone-900 mb-2">確定要清空金額嗎？</h3>
+                <p class="text-xs text-stone-500 font-bold mb-5">這將會清空所有金額，但會保留已輸入的人名。</p>
+                <div class="flex space-x-3">
+                    <button class="flex-1 py-2.5 rounded-xl border-2 border-stone-900 bg-white text-stone-600 font-black hover:bg-stone-50 active:scale-95 transition-all" onclick="this.closest('.fixed').remove()">取消</button>
+                    <button class="flex-1 py-2.5 rounded-xl border-2 border-stone-900 bg-rose-500 text-white font-black hover:bg-rose-600 active:scale-95 jp-shadow-sm transition-all" id="sp_doResetBtn">確認清空</button>
+                </div>
+            `;
+            overlay.appendChild(card); document.body.appendChild(overlay);
+            
+            document.getElementById('sp_doResetBtn').onclick = () => {
+                document.getElementById('sp_customTitle').value = '';
+                document.querySelectorAll('.sp-price').forEach(i => i.value = '');
+                document.querySelectorAll('.sp-shared-price').forEach(i => i.value = '');
+                document.getElementById('sp_evenTotal').value = '';
+                document.getElementById('sp_sharedList').innerHTML = '';
+                sp_calculate(); overlay.remove(); alertModal("金額已全部清空！ 🔄");
+            };
+        }
+
+        function sp_copyToWhatsApp() {
+            const title = document.getElementById('sp_customTitle').value || "食飯分帳 BILL";
+            const paymeID = document.getElementById('sp_paymeID').value;
+            const isSvc = document.getElementById('sp_enableService').checked;
+            const isRound = document.getElementById('sp_roundUp').checked;
+            const ratio = isSvc ? (1 + sp_service / 100) : 1;
+            
+            let msg = `📝 *${title}*\n📅 ${document.getElementById('sp_currentDate').innerText}\n`;
+            
+            // 若有收服務費，在此顯示
+            if (isSvc && sp_service > 0) {
+                msg += `🏷️ 包含 ${sp_service}% 服務費\n`;
+            }
+            msg += `--------------------------\n`;
+
+            if (sp_mode === 'split') {
+                const { sTotal } = sp_calculate();
+                const pplCount = document.querySelectorAll('.sp-price').length;
+                const sPerPpl = sTotal / (pplCount || 1);
+
+                document.querySelectorAll('.sp-name').forEach((nameInput, index) => {
+                    const priceInput = document.querySelectorAll('.sp-price')[index];
+                    const name = nameInput.value || "Guest";
+                    const pPrice = parseFloat(priceInput.value) || 0;
+                    
+                    if (pPrice > 0 || sPerPpl > 0) {
+                        const pPart = pPrice * ratio;
+                        let final = pPart + sPerPpl;
+                        final = isRound ? Math.ceil(final) : Math.round(final * 10) / 10;
+                        msg += `👤 ${name}: $${final}\n`;
+                        if(sTotal > 0) msg += `   (個人 $${pPart.toFixed(1)} + 共享 $${sPerPpl.toFixed(1)})\n`;
+                        msg += `\n`;
+                    }
+                });
+            } else {
+                const pplCount = parseInt(document.getElementById('sp_evenCount').value) || 1;
+                const grand = sp_calculate().grand;
+                let finalPerPpl = grand / pplCount;
+                finalPerPpl = isRound ? Math.ceil(finalPerPpl) : Math.round(finalPerPpl * 10) / 10;
+                msg += `💰 總額: $${grand.toFixed(1)}\n👥 人數: ${pplCount}\n👉 每人需付: $${finalPerPpl.toFixed(1)}\n`;
+            }
+
+            if (paymeID) msg += `--------------------------\n🏧 *PayMe Here* 💸\nhttps://payme.hsbc/${paymeID}\n`;
+            
+            const textArea = document.createElement("textarea");
+            textArea.value = msg;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+            try { 
+                document.execCommand('copy'); 
+                alertModal("已成功複製，快去 WhatsApp 貼上吧！ ✅"); 
+            } catch (err) { 
+                alertModal("複製失敗，請手動複製 ❌"); 
+            }
+            document.body.removeChild(textArea);
+        }
+    </script>
+</body>
+</html>
