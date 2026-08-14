@@ -320,7 +320,7 @@
                             <h3 class="text-[12px] font-black text-stone-900 uppercase tracking-widest mb-3 serif-font ml-1 flex items-center gap-2">
                                 👤 個人項目
                             </h3>
-                            <div id="sp_itemList" class="space-y-2 mb-3"></div>
+                            <div id="sp_itemList" class="space-y-2.5 mb-3"></div>
                             <button onclick="sp_addItem()" class="w-full py-2.5 border-2 border-dashed border-stone-300 text-[11px] text-stone-500 font-black rounded-xl hover:border-stone-900 hover:text-stone-900 transition-all flex items-center justify-center gap-1.5 bg-stone-50">
                                 <i data-lucide="plus" class="w-3.5 h-3.5"></i> 加人 ADD PERSON
                             </button>
@@ -1042,19 +1042,26 @@
             for(let i=0; i < initialCount; i++) sp_addItem(savedNames[i] || '', false);
         }
 
+        // 修改：新增個人的專屬結算UI層
         function sp_addItem(name = '', focus = true) {
             const list = document.getElementById('sp_itemList');
             const row = document.createElement('div');
-            row.className = 'flex items-center space-x-1.5 animate-[fadeIn_0.2s_ease-out]';
+            row.className = 'sp-person-row flex flex-col space-y-1.5 bg-stone-50/70 border-2 border-stone-200 focus-within:border-stone-400 focus-within:bg-stone-50 rounded-xl p-2 animate-[fadeIn_0.2s_ease-out] transition-colors';
             row.innerHTML = `
-                <input type="text" value="${name}" placeholder="姓名 Name" oninput="sp_saveUserData()" class="sp-name flex-1 min-w-0 bg-stone-50 border-2 border-stone-900 rounded-xl px-2.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white transition-colors h-[38px]">
-                <div class="flex items-center bg-stone-50 border-2 border-stone-900 rounded-xl px-1.5 py-2 flex-shrink-0 focus-within:bg-white transition-colors h-[38px]">
-                    <span class="text-[10px] font-black text-stone-400 mr-0.5">$</span>
-                    <input type="number" step="any" inputmode="decimal" placeholder="0" class="sp-price w-12 bg-transparent text-xs text-right font-black text-stone-900 focus:outline-none" onfocus="this.select()" oninput="sp_calculate()">
+                <div class="flex items-center space-x-1.5">
+                    <input type="text" value="${name}" placeholder="姓名 Name" oninput="sp_saveUserData()" class="sp-name flex-1 min-w-0 bg-white border-2 border-stone-900 rounded-lg px-2.5 py-1.5 text-xs font-bold text-stone-900 focus:outline-none h-[36px]">
+                    <div class="flex items-center bg-white border-2 border-stone-900 rounded-lg px-1.5 py-1.5 flex-shrink-0 h-[36px]">
+                        <span class="text-[10px] font-black text-stone-400 mr-0.5">$</span>
+                        <input type="number" step="any" inputmode="decimal" placeholder="0" class="sp-price w-12 bg-transparent text-xs text-right font-black text-stone-900 focus:outline-none" onfocus="this.select()" oninput="sp_calculate()">
+                    </div>
+                    <button onclick="this.closest('.sp-person-row').remove(); sp_calculate(); sp_saveUserData();" class="w-9 h-[36px] flex items-center justify-center border-2 border-stone-900 bg-white hover:bg-rose-50 text-stone-400 hover:text-rose-500 rounded-lg active:scale-95 flex-shrink-0 transition-colors">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
                 </div>
-                <button onclick="this.parentElement.remove(); sp_calculate(); sp_saveUserData();" class="w-10 h-[38px] flex items-center justify-center border-2 border-stone-900 bg-white hover:bg-rose-50 text-stone-400 hover:text-rose-500 rounded-xl active:scale-95 flex-shrink-0 transition-colors">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                </button>`;
+                <div class="flex justify-between items-center px-1">
+                    <span class="text-[9.5px] font-bold text-stone-500 sp-breakdown tracking-wide"></span>
+                    <span class="text-[11px] font-black text-stone-400 sp-indiv-total">應付 $0.0</span>
+                </div>`;
             list.appendChild(row);
             lucide.createIcons({root: row});
             if (focus) row.querySelector('.sp-name').focus();
@@ -1087,18 +1094,51 @@
         function sp_calculate() {
             let pTotal = 0, sTotal = 0;
             const isSvc = document.getElementById('sp_enableService').checked;
+            const isRound = document.getElementById('sp_roundUp').checked;
             const ratio = isSvc ? (1 + sp_service / 100) : 1;
 
             if (sp_mode === 'split') {
                 document.querySelectorAll('.sp-price').forEach(i => pTotal += (parseFloat(i.value) || 0) * ratio);
                 document.querySelectorAll('.sp-shared-price').forEach(i => sTotal += parseFloat(i.value) || 0);
+                
+                // 動態計算並更新每個人的獨立介面
+                const pplCount = document.querySelectorAll('.sp-price').length;
+                const sPerPpl = sTotal / (pplCount || 1);
+
+                document.querySelectorAll('.sp-person-row').forEach((row) => {
+                    const priceInput = row.querySelector('.sp-price');
+                    const breakdownEl = row.querySelector('.sp-breakdown');
+                    const totalEl = row.querySelector('.sp-indiv-total');
+                    
+                    const pPrice = parseFloat(priceInput.value) || 0;
+                    
+                    if (pPrice > 0 || sPerPpl > 0) {
+                        const pPart = pPrice * ratio;
+                        let final = pPart + sPerPpl;
+                        final = isRound ? Math.ceil(final) : Math.round(final * 10) / 10;
+                        
+                        let breakdownText = `個人 $${pPart.toFixed(1)}`;
+                        if (sPerPpl > 0) breakdownText += ` + 共享 $${sPerPpl.toFixed(1)}`;
+                        breakdownEl.innerText = breakdownText;
+                        
+                        totalEl.innerText = `應付 $${final.toLocaleString('en-US', {minimumFractionDigits: 1})}`;
+                        totalEl.classList.add('text-rose-600');
+                        totalEl.classList.remove('text-stone-400');
+                    } else {
+                        breakdownEl.innerText = '';
+                        totalEl.innerText = '應付 $0.0';
+                        totalEl.classList.remove('text-rose-600');
+                        totalEl.classList.add('text-stone-400');
+                    }
+                });
+
             } else {
                 pTotal = (parseFloat(document.getElementById('sp_evenTotal').value) || 0) * ratio;
                 sTotal = 0;
             }
             
             let grand = pTotal + sTotal;
-            grand = document.getElementById('sp_roundUp').checked ? Math.ceil(grand) : Math.round(grand * 10) / 10;
+            grand = isRound ? Math.ceil(grand) : Math.round(grand * 10) / 10;
             document.getElementById('sp_totalDisplay').innerText = `$${grand.toLocaleString('en-US', {minimumFractionDigits: 1})}`;
             return { pTotal, sTotal, grand };
         }
@@ -1162,7 +1202,6 @@
             
             let msg = `📝 *${title}*\n📅 ${document.getElementById('sp_currentDate').innerText}\n`;
             
-            // 若有收服務費，在此顯示
             if (isSvc && sp_service > 0) {
                 msg += `🏷️ 包含 ${sp_service}% 服務費\n`;
             }
